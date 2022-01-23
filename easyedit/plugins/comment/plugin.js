@@ -29,7 +29,7 @@ CKEDITOR.dialog.add( 'commentDialog', function( editor ) {
         ],
         onOk: function() {
             var dialog = this;
-            editor.insertHtml('<span style="color:#355e3b" class="comment"><img src="'+url_path+'comment/icons/comment.png" />'+dialog.getValueOf( 'comment_input', 'comment_id' )+'</span>');
+            editor.insertHtml('<span style="color:#355e3b" class="comment"><img src="../'+url_path+'comment/icons/comment.png" />'+dialog.getValueOf( 'comment_input', 'comment_id' )+'</span>');
         }
     };
 });

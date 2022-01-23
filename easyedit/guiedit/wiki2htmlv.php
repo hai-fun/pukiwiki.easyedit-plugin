@@ -15,15 +15,15 @@
 //
 //
 //	File: 
-//	  wiki2xhtml.php
-//	  PukiWiki の構文を XHTML に変換
+//	  wiki2htmlv.php
+//	  PukiWiki の構文を HTML5 に変換
 //
-
+// PHP8対応、細かいところを修正 byはいふん
 
 //	設定の読み込み
-require_once('easyedit/guiedit/guiedit.ini.php');
+//require_once('easyedit/guiedit/guiedit.ini.php');
 
-//	PukiWiki の構文を XHTML に変換
+//	PukiWiki の構文を HTML5 に変換
 function guiedit_convert_html($lines) {
     global $vars;
     
@@ -95,7 +95,7 @@ function guiedit_convert_ref($args, $div = FALSE) {
 	$alt = !empty($_title) ? htmlsc(join(',', $_title)) : '';
 	$alt = preg_replace("/^,/", '', $alt);
 
-	$attribute = 'class="ref" contenteditable="false"' . ((UA_NAME == MSIE) ? '' : ' style="cursor:default"');
+	$attribute = 'class="ref" contenteditable="false"' . ((UA_NAME == "MSIE") ? '' : ' style="cursor:default"');
 	$attribute .= ' _filename="' . $filename . '"';
 	$attribute .= ' _alt="' . $alt . '"';
 	$attribute .= ' _width="' . ($params['_w'] ? $params['_w'] : '') . '"';
@@ -132,16 +132,16 @@ function guiedit_convert_ref($args, $div = FALSE) {
 
 
 function guiedit_make_line_rules($line) {
-	global $guiedit_line_rules, $guiedit_facemark_rules;
+	global $line_rules;
 	global $usefacemark;
 	static $pattern, $replace;
+	$guiedit_line_rules = array();
 	if (!isset($pattern)) {
 		if ($usefacemark) {
-			$guiedit_line_rules += $guiedit_facemark_rules;
+			$guiedit_line_rules += $line_rules;
 		}
-		$pattern = array_map(create_function('$a', 'return \'/\' . $a . \'/\';'), array_keys($guiedit_line_rules));
+		$pattern = array_map(function($a){return '/' . $a . '/';}, array_keys($guiedit_line_rules));
 		$replace = array_values($guiedit_line_rules);
-		unset($guiedit_facemark_rules);
 		unset($guiedit_line_rules);
 	}
 	
@@ -158,10 +158,12 @@ class InlineConverterEx {
 		}
 
 		// インライン・プラグイン
-		$pattern = '/&amp;#038;(\w+)(?:\(((?:(?!\)[;{]).)*)\))?(?:\{((?:(?R)|(?!};).)*)\})?;/';
+		$pattern = '/&amp;(\w+)(?:\(((?:(?!\)[;{]).)*)\))?(?:\{((?:(?R)|(?!};).)*)\})?;/';
 		$line = preg_replace_callback($pattern, array(&$this, 'convert_plugin'), $line);
 		
 		// ルールの変換
+		$line = guiedit_make_line_rules($line);
+		
 		// 文字サイズの変換
 		$pattern = "/<span\s(style=\"font-size:(\d+)px|class=\"size([1-7])).*?>/";
 		$line = preg_replace_callback($pattern, array(&$this, 'convert_size'), $line);
@@ -301,7 +303,7 @@ class InlineConverterEx {
 		}
 		
 		$inner = '&' . $matches[1] . ($matches[2] ? '('.$matches[2].')' : '') . ($body ? '{'.$body.'}' : '') . ';';
-		$style = (UA_NAME == MSIE) ? '' : ' style="cursor:default"';
+		$style = (UA_NAME == "MSIE") ? '' : ' style="cursor:default"';
 		
 		return '<span class="plugin" contenteditable="false"'.$style.'>'.$inner.'</span>';
 	}
@@ -368,10 +370,15 @@ class ElementEx
 	var $elements; // References of childs
 	var $last;     // Insert new one at the back of the $last
 
-	function ElementEx()
+	function __construct()
 	{
 		$this->elements = array();
 		$this->last     = & $this;
+	}
+
+	function ElementEx()
+	{
+		$this->__construct();
 	}
 
 	function setParent(& $parent)
@@ -396,7 +403,7 @@ class ElementEx
 		return $this->last = & $obj->last;
 	}
 
-	function canContain($obj)
+	function canContain(& $obj)
 	{
 		return TRUE;
 	}
@@ -514,11 +521,16 @@ function & Factory_DivEx(& $root, $text)
 // InlineEx elements
 class InlineEx extends ElementEx
 {
-	function InlineEx($text)
+	function __construct($text)
 	{
-		parent::ElementEx();
+		parent::__construct();
 		$this->elements[] = trim((substr($text, 0, 1) == "\n") ?
 			$text : guiedit_make_link($text));
+	}
+	
+	function InlineEx($text)
+	{
+		$this->__construct($text);
 	}
 
 	function & insert(& $obj)
@@ -527,7 +539,7 @@ class InlineEx extends ElementEx
 		return $this;
 	}
 
-	function canContain($obj)
+	function canContain(& $obj)
 	{
 		return is_a($obj, 'InlineEx');
 	}
@@ -551,9 +563,9 @@ class ParagraphEx extends ElementEx
 {
 	var $param;
 
-	function ParagraphEx($text, $param = '')
+	function __construct($text, $param = '')
 	{
-		parent::ElementEx();
+		parent::__construct();
 		$this->param = $param;
 		if ($text == '') return;
 
@@ -563,7 +575,12 @@ class ParagraphEx extends ElementEx
 		$this->insert(Factory_InlineEx($text));
 	}
 
-	function canContain($obj)
+	function ParagraphEx($text, $param = '')
+	{
+		$this->__construct($text, $param);
+	}
+
+	function canContain(& $obj)
 	{
 		return is_a($obj, 'InlineEx');
 	}
@@ -583,9 +600,9 @@ class HeadingEx extends ElementEx
 	var $id;
 	var $msg_top;
 
-	function HeadingEx(& $root, $text)
+	function __construct(& $root, $text)
 	{
-		parent::ElementEx();
+		parent::__construct();
 
 		$this->level = min(3, strspn($text, '*'));
 		
@@ -597,6 +614,11 @@ class HeadingEx extends ElementEx
 		
 		$this->insert(Factory_InlineEx($text));
 		$this->level++; // h2,h3,h4
+	}
+
+	function HeadingEx(& $root, $text)
+	{
+		$this->__construct($root, $text);
 	}
 
 	function & insert(& $obj)
@@ -621,10 +643,16 @@ class HeadingEx extends ElementEx
 // Horizontal Rule
 class HRuleEx extends ElementEx
 {
+	function __construct(& $root, $text)
+	{
+		parent::__construct();
+	}
+	
 	function HRuleEx(& $root, $text)
 	{
-		parent::ElementEx();
+		$this->__construct($root, $text);
 	}
+
 
 	function canContain(& $obj)
 	{
@@ -648,9 +676,9 @@ class ListContainerEx extends ElementEx
 	var $margin;
 	var $left_margin;
 
-	function ListContainerEx($tag, $tag2, $head, $text)
+	function __construct($tag, $tag2, $head, $text)
 	{
-		parent::ElementEx();
+		parent::__construct();
 
 		$var_margin      = '_' . $tag . '_margin';
 		$var_left_margin = '_' . $tag . '_left_margin';
@@ -667,6 +695,11 @@ class ListContainerEx extends ElementEx
 		parent::insert(new ListElementEx($this->level, $tag2));
 		if ($text != '')
 			$this->last = & $this->last->insert(Factory_InlineEx($text));
+	}
+
+	function ListContainerEx($tag, $tag2, $head, $text)
+	{
+		$this->__construct($tag, $tag2, $head, $text);
 	}
 
 	function canContain(& $obj)
@@ -716,11 +749,16 @@ class ListContainerEx extends ElementEx
 
 class ListElementEx extends ElementEx
 {
-	function ListElementEx($level, $head)
+	function __construct($level, $head)
 	{
-		parent::ElementEx();
+		parent::__construct();
 		$this->level = $level;
 		$this->head  = $head;
+	}
+
+	function ListElementEx($level, $head)
+	{
+		$this->__construct($level, $head);
 	}
 
 	function canContain(& $obj)
@@ -739,9 +777,14 @@ class ListElementEx extends ElementEx
 // - Three
 class UListEx extends ListContainerEx
 {
+	function __construct(& $root, $text)
+	{
+		parent::__construct('ul', 'li', '-', $text);
+	}
+	
 	function UListEx(& $root, $text)
 	{
-		parent::ListContainerEx('ul', 'li', '-', $text);
+		$this->__construct($root, $text);
 	}
 }
 
@@ -750,9 +793,14 @@ class UListEx extends ListContainerEx
 // + Three
 class OListEx extends ListContainerEx
 {
+	function __construct(& $root, $text)
+	{
+		parent::__construct('ol', 'li', '+', $text);
+	}
+	
 	function OListEx(& $root, $text)
 	{
-		parent::ListContainerEx('ol', 'li', '+', $text);
+		$this->__construct($root, $text);
 	}
 }
 
@@ -761,12 +809,17 @@ class OListEx extends ListContainerEx
 // : definition3 | description3
 class DListEx extends ListContainerEx
 {
-	function DListEx($out)
+	function __construct($out)
 	{
-		parent::ListContainerEx('dl', 'dt', ':', $out[0]);
+		parent::__construct('dl', 'dt', ':', $out[0]);
 		$this->last = & ElementEx::insert(new ListElementEx($this->level, 'dd'));
 		if ($out[1] != '')
 			$this->last = & $this->last->insert(Factory_InlineEx($out[1]));
+	}
+	
+	function DListEx($out)
+	{
+		$this->__construct($out);
 	}
 }
 
@@ -778,7 +831,12 @@ class BQuoteEx extends ElementEx
 
 	function BQuoteEx(& $root, $text)
 	{
-		parent::ElementEx();
+		$this->__construct($root, $text);
+	}
+
+	function __construct(& $root, $text)
+	{
+		parent::__construct();
 
 		$head = substr($text, 0, 1);
 		$this->level = min(3, strspn($text, $head));
@@ -842,9 +900,9 @@ class TableCellEx extends ElementEx
 	var $hspace = 0;
 	var $fspace = 0;
 
-	function TableCellEx($text, $is_template = FALSE)
+	function __construct($text, $is_template = FALSE)
 	{
-		parent::ElementEx();
+		parent::__construct();
 		$this->style = $matches = array();
 		$this->is_template = $is_template;
 
@@ -884,7 +942,7 @@ class TableCellEx extends ElementEx
 			$text      = substr($text, 1);
 		}
 
-		if ($text != '' && $text{0} == '#') {
+		if ($text != '' && $text[0] == '#') {
 			// Try using DivEx class for this $text
 			$obj = & Factory_DivEx($this, $text);
 			if (is_a($obj, 'ParagraphEx'))
@@ -898,6 +956,11 @@ class TableCellEx extends ElementEx
 		}
 
 		$this->insert($obj);
+	}
+
+	function TableCellEx($text, $is_template = FALSE)
+	{
+		$this->__construct($text, $is_template);
 	}
 
 	function setStyle(& $style)
@@ -949,9 +1012,9 @@ class TableEx extends ElementEx
 	var $types;
 	var $col; // number of column
 
-	function TableEx($out)
+	function __construct($out)
 	{
-		parent::ElementEx();
+		parent::__construct();
 
 		$cells       = explode('|', $out[1]);
 		$this->col   = count($cells);
@@ -962,6 +1025,11 @@ class TableEx extends ElementEx
 		foreach ($cells as $cell)
 			$row[] = new TableCellEx($cell, $is_template);
 		$this->elements[] = $row;
+	}
+
+	function TableEx($out)
+	{
+		$this->__construct($out);
 	}
 
 	function canContain(& $obj)
@@ -1057,9 +1125,9 @@ class YTableEx extends ElementEx
 {
 	var $col;
 
-	function YTableEx($_value)
+	function __construct($_value)
 	{
-		parent::ElementEx();
+		parent::__construct();
 
 		$align = $value = $matches = array();
 		foreach($_value as $val) {
@@ -1092,6 +1160,11 @@ class YTableEx extends ElementEx
 		$this->elements[] = $str;
 	}
 
+	function YTableEx($_value)
+	{
+		$this->__construct($_value);
+	}
+
 	function canContain(& $obj)
 	{
 		return is_a($obj, 'YTableEx') && ($obj->col == $this->col);
@@ -1118,12 +1191,17 @@ class YTableEx extends ElementEx
 // ' 'Space-beginning sentence
 class PreEx extends ElementEx
 {
-	function PreEx(& $root, $text)
+	function __construct(& $root, $text)
 	{
 		global $preformat_ltrim;
-		parent::ElementEx();
-		$this->elements[] = htmlsc(
-			(! $preformat_ltrim || $text == '' || $text{0} != ' ') ? $text : substr($text, 1));
+		parent::__construct();
+		$this->elements[] = htmlsc(htmlsc(
+			(! $preformat_ltrim || $text == '' || $text[0] != ' ') ? $text : substr($text, 1)));
+	}
+
+	function PreEx(& $root, $text)
+	{
+		$this->__construct($root, $text);
 	}
 
 	function canContain(& $obj)
@@ -1150,10 +1228,15 @@ class DivEx extends ElementEx
 	var $name;
 	var $param;
 
+	function __construct($out)
+	{
+		parent::__construct();
+		list(, $this->name, $this->param, $this->text) = array_pad($out, 4, '');
+	}
+
 	function DivEx($out)
 	{
-		parent::ElementEx();
-		list(, $this->name, $this->param, $this->text) = array_pad($out, 4, '');
+		$this->__construct($out);
 	}
 
 	function canContain(& $obj)
@@ -1184,7 +1267,7 @@ class DivEx extends ElementEx
 		}
 		
 		$inner = "#$this->name" . ($this->param ? "($this->param)" : '') . $this->text;
-		$style = (UA_NAME == MSIE) ? '' : ' style="cursor:default"';
+		$style = (UA_NAME == "MSIE") ? '' : ' style="cursor:default"';
 		return "<p>".$this->wrap($inner, 'span', ' class="plugin"' . $style)."</p>";
 	}
 }
@@ -1193,10 +1276,15 @@ class AlignEx extends ElementEx
 {
 	var $align;
 
+	function __construct($align)
+	{
+		parent::__construct();
+		$this->align = $align;
+	}
+
 	function AlignEx($align)
 	{
-		parent::ElementEx();
-		$this->align = $align;
+		$this->__construct($align);
 	}
 
 	function canContain(& $obj)
@@ -1227,9 +1315,14 @@ class BodyEx extends ElementEx
 	
 	var $comments = array();
 
+	function __construct()
+	{
+		parent::__construct();
+	}
+
 	function BodyEx()
 	{
-		parent::ElementEx();
+		$this->__construct();
 	}
 
 	function parse(& $lines)
@@ -1287,7 +1380,7 @@ class BodyEx extends ElementEx
 			}
 
 			// The first character
-			$head = $line{0};
+			$head = $line[0];
 
 			// HeadingEx
 			if ($head == '*') {
@@ -1348,7 +1441,7 @@ class BodyEx extends ElementEx
 			$comments[$key] = array_shift($this->comments);
 		}
 		$comment = join("\n", $comments);
-		return '<span class="comment" style="color:#355e3b"><img src="./easyedit/plugins/comment/icons/comment.png" />'.htmlsc($comment).'</span>';
+		return '<span class="comment" style="color:#355e3b"><img alt="Comment" src="./easyedit/plugins/comment/icons/comment.png" />'.htmlsc($comment).'</span>';
 	}
 }
 

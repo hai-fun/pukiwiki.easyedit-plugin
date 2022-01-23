@@ -21,4 +21,7 @@ CKEDITOR.editorConfig = function( config )
 	config.format_tags = 'p;h2;h3;h4;pre';
 	config.removeDialogTabs = 'image:advanced;link:advanced';
     config.startupShowBorders = false;
+	config.htmlEncodeOutput = false;
+	config.entities = false;
+	config.contentsCss = [guiedit_skin_dir];
 };

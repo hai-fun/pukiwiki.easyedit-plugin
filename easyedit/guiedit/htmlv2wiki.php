@@ -15,13 +15,14 @@
 //
 //
 //	File:
-//	  xhtml2wiki.php
-//	  XHTML を PukiWiki の構文に変換
+//	  htmlv2wiki.php
+//	  HTML5 を PukiWiki の構文に変換
+// PHP8対応、細かいところを修正 byはいふん
 
-function xhtml2wiki($source)
+function htmlv2wiki($source)
 {
 	// 変換クラスのオブジェクト生成とその設定
-	$obj = new XHTML2Wiki();
+	$obj = new HTMLV2Wiki();
 	
 	// 変換メソッドの呼び出し
 	$body = $obj->Convert($source);
@@ -31,7 +32,7 @@ function xhtml2wiki($source)
 
 
 // 変換クラス
-class XHTML2Wiki
+class HTMLV2Wiki
 {
 	var $body;
 	var $text;
@@ -41,7 +42,7 @@ class XHTML2Wiki
 	var $protect_data;
 	var $multilineplugin;
 	//	初期化
-	function XHTML2Wiki() {
+	function __construct() {
 		$this->parent_div = array('');
 		$this->div_level = 0;
 		$this->level_array = array(0);
@@ -49,6 +50,10 @@ class XHTML2Wiki
 		$this->text = '';
         $this->body = array();
         $this -> multilineplugin = false;
+	}
+	
+	function HTMLV2Wiki() {
+		$this->__construct();
 	}
 	
 	// 変換メソッド
@@ -571,10 +576,12 @@ class XHTML2Wiki
 			$line = ($matches[3] ? (strtoupper($matches[3]) . ':') : '') . $matches[4];
 		}
 		if (preg_match("/(.*)<\/(p|div)>/", $line, $matches)) {
-			if ($matches[2] == 'p') {
-				$this->OutputLine($matches[1]);
-			}else if ($matches[1]) {
+			// 多分これ逆だと思います。 byはいふん
+			if ($matches[1]) {
 				$this->OutputLine('', $matches[1]);
+			}
+			else if ($matches[2] == 'p') {
+				$this->OutputLine($matches[1]);
 			}
 		}
 		else if ($line) {
@@ -600,8 +607,10 @@ class XHTML2Wiki
 		$line = preg_replace("/<a\sname=\"(.*?)\"><\/a>/", "&aname($1);", $line);
 		$line = preg_replace("/<a\sname=\"(.*?)\">(.*?)<\/a>/", "&aname($1){" . "$2" . "};", $line);
         // 注釈(EasyEdit ver)
-        $line = preg_replace("/<span\sclass=\"note\"><img\s.*?\s\/>(.*?)<\/span>/", "(($1))", $line);
-		// 顔文字・注釈・コメント
+        $line = preg_replace("/<span\sclass=\"note\"><img.*?>(.*?)<\/span>/", "(($1))", $line);
+        // コメント(EasyEdit ver) なぜここがなかったのか...?
+        $line = preg_replace("/<span\sclass=\"comment\".*?><img.*?>(.*?)<\/span>/", "//$1", $line);
+		// 顔文字
 		$line = preg_replace_callback("/\s?<img\s(.*?)>/", array(&$this, 'Image'), $line);
 		// 太字
 		$line = preg_replace("/<\/?strong>/", "''", $line);
@@ -676,8 +685,10 @@ class XHTML2Wiki
 		$attribute = $matches[1];
 		if (preg_match("/alt=\"(.*?)\"/", $attribute, $matches)) {
 			$alt = $matches[1];
+			/*
 			// 注釈
 			if ($alt == 'Note' && preg_match("/title=\"(.+?)\"/", $attribute, $matches)) {
+				echo $matches[1];
 				return '((' . $this->DecodeSpecialChars($matches[1]) . '))';
 			}
 			// コメント
@@ -688,10 +699,11 @@ class XHTML2Wiki
 				array_push($this->protect_data, $comment);
 				return "\n___GUIPD" . count($this->protect_data) . "___\n";
 			}
+			*/
 			// 顔文字
 			// JO1UPK
 			// else if (preg_match("/^\[.+\]$/", $alt, $matches)) {
-			else if (preg_match("/^\[(.+)\]$/", $alt, $matches)) {
+			if (preg_match("/^\[(.+)\]$/", $alt, $matches)) {
 				return '&' . $matches[1].';';
 			}
 			return ' '.$alt.' ';
@@ -810,8 +822,8 @@ class XHTML2Wiki
 
 	// エンコード
 	function EncodeSpecialChars($line) {
-		static $pattern = array("/\%\%/", "/\'\'/", "/\[\[/", "/\]\]/", "/\{/", "/\|/", "/\}/");
-		static $replace = array("&#037;&#037;", "&#039;&#039;", "&#091;&#091;",
+		static $pattern = array("/&amp;/", "/\%\%/", "/\'\'/", "/\[\[/", "/\]\]/", "/\{/", "/\|/", "/\}/");
+		static $replace = array("&#038;amp;", "&#037;&#037;", "&#039;&#039;", "&#091;&#091;",
 								"&#093;&#093;", "&#123;", "&#124;", "&#125;");
 
 		return preg_replace($pattern, $replace, $line);
@@ -819,8 +831,8 @@ class XHTML2Wiki
 
 	// 特殊な HTML エンティティを文字に戻す
 	function DecodeSpecialChars($line) {
-		static $pattern = array("/&amp;/", "/&lt;/", "/&gt;/", "/&quot;/", "/&nbsp;/","/&#091;/","/&#093;/");
-		static $replace = array('&', '<', '>', '"', ' ','[',']');
+		static $pattern = array("/&amp;/", "/&lt;/", "/&gt;/", "/&quot;/", "/&nbsp;/","/&#091;/","/&#093;/", "/&#038;amp;/");
+		static $replace = array('&', '<', '>', '"', ' ','[',']', '&amp;');
 		
 		return preg_replace($pattern, $replace, $line);
 	}

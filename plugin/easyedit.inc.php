@@ -1,35 +1,23 @@
 <?php
-// $Id: easyedit.inc.php,v 1.09 2021/01/29 22:48:00 K Exp $
 
+// guiedit.inc.php, v 1.63.2 2009/04/20 23:06:00 upk Exp $
+// easyedit.inc.php,v 1.09 2021/01/29 22:48:00 K Exp $
+// $Id: easyedit.inc.php,v 1.10 2021/12/30 00:00:00 haifun Exp $
 /** 
 * @link http://pkom.ml/?%E3%83%97%E3%83%A9%E3%82%B0%E3%82%A4%E3%83%B3/easyedit.inc.php
 * @author K
-* @license http://www.gnu.org/licenses/gpl.ja.html GPL
+* @license http://www.gnu.org/licenses/gpl.ja.html GNU General Public License Version 2 or later (GPL)
 */
+
+// PHP8対応、細かいところを修正 byはいふん
+
+// define('PLUGIN_EASYEDIT_SKIN_FILE', SKIN_DIR . "xxx.css");
+define('PLUGIN_EASYEDIT_SKIN_FILE', "./skin/pukiwiki.css");
 
 define('EASYEDIT_LIB_PATH', './easyedit/');
 define('PREG_EASYEDIT_LIB_PATH', '.\/easyedit\/');
 
 define('PLUGIN_EASYEDIT_FREEZE_REGEX', '/^(?:#freeze(?!\w)\s*)+/im');
-
-//絵文字リスト('ファイル名,絵文字(省略可)')
-global $easyedit_emoji_list;
-$easyedit_emoji_list = array(
-'heart',
-'smile',
-'bigsmile',
-'huh',
-'oh',
-'wink',
-'sad',
-'worried',
-'smile,:)',
-'smile,(^^)',
-'bigsmile,(^-^',
-'oh,(..;',
-'sad,(--;',
-'worried,(^^;',
-);
 
 function plugin_easyedit_action()
 {
@@ -78,11 +66,13 @@ function plugin_easyedit_preview_with_template()
 	return plugin_easyedit_preview($msg);
 }
 
+
 /**
  * Preview
  *
  * @param msg preview target
  */
+ /*
 function plugin_easyedit_inline_replace($msg){
     $msg = str_replace("<strong>",'\'\'',$msg);
     $msg = str_replace("</strong>",'\'\'',$msg);
@@ -142,7 +132,7 @@ function plugin_easyedit_inline_replace($msg){
             }
         }
     }
-    /*
+    / *
 	if (preg_match_all("/<img\salt=\"\"\ssrc=\"(.+?)\"\sstyle=\"height:(.+?);\swidth:(.+?)\"\s\/>/u", $msg, $match_msg,PREG_SET_ORDER)){
         foreach ($match_msg as $value) {
             $msg = str_replace($value[0],"&ref(".$value[1].");",$msg);
@@ -153,7 +143,7 @@ function plugin_easyedit_inline_replace($msg){
             $msg = str_replace($value[0],"&ref(".$value[2].");",$msg);
         }
     }
-    */
+    * /
     if (preg_match_all("/<span\sclass=\"note\"><img\salt=\"Note\"\ssrc=\"".PREG_EASYEDIT_LIB_PATH."plugins\/note\/icons\/note2.png\"\s\/>(.+?)<\/span>/u", $msg, $match_msg,PREG_SET_ORDER)){
         foreach ($match_msg as $value) {
             $msg = str_replace($value[0],"((".$value[1]."))",$msg);
@@ -167,12 +157,17 @@ function plugin_easyedit_inline_replace($msg){
     $msg  = str_replace("&amp;","&",$msg);
     return $msg;
 }
+*/
 
+/*
 function plugin_easyedit_img2emoji($msg){
     $msg = preg_replace("/<img alt=\"(.*)\" src=\"(.*)\" type=\"emoji\"(.*) \/>/u","&$1;",$msg);
     return $msg;
 }
+*/
+
 //絵文字用
+/*
 function plugin_easyedit_emoji2img($msg){
     global $easyedit_emoji_list;
     foreach ($easyedit_emoji_list as $value){
@@ -213,9 +208,9 @@ function plugin_easyedit_inline_replace2($msg){
     }
     $msg = str_replace("&br;",'<br />',$msg);
     //$msg = preg_replace("^#br$",'<br />',$msg);
-    /*
+    / *
     $msg = preg_replace("/&gt;(.*)&lt;/us",'<blockquote><p class="quotation">$1</p></blockquote>',$msg);
-    $msg = preg_replace("/&gt;(.*)\n/u",'<blockquote><p class="quotation">$1</p></blockquote>',$msg);*/
+    $msg = preg_replace("/&gt;(.*)\n/u",'<blockquote><p class="quotation">$1</p></blockquote>',$msg);* /
     if (preg_match_all("/COLOR\((.*?)\):(.*?)\n/u", $msg, $match_msg,PREG_SET_ORDER)){
         foreach ($match_msg as $value) {
             $msg = str_replace($value[0],"<span style=\"color:".$value[1].";\">".$value[2]."</span>",$msg);
@@ -265,21 +260,23 @@ function plugin_easyedit_inline_replace2($msg){
 	        }
 	    }
     }
-    */
+    * /
     $msg = plugin_easyedit_emoji2img($msg);
     return $msg;
 }
+*/
 
 function plugin_easyedit_preview($msg)
 {
 	global $vars;
 	global $_title_preview, $_msg_preview, $_msg_preview_delete;
-
+	
 	$page = isset($vars['page']) ? $vars['page'] : '';
+	
     //EasyEdit
     require_once(EASYEDIT_LIB_PATH . 'guiedit/htmlv2wiki.php');
-    $msg = xhtml2wiki($msg);
-    $msg = plugin_easyedit_inline_replace($msg);
+    $msg = htmlv2wiki($msg);
+    //$msg = plugin_easyedit_inline_replace($msg);
     //--------
 	$msg = preg_replace(PLUGIN_EASYEDIT_FREEZE_REGEX, '', $msg);
 	$postdata = $msg;
@@ -303,6 +300,7 @@ function plugin_easyedit_preview($msg)
 		$postdata = drop_submit(convert_html($postdata));
 		$body .= '<div id="preview">' . $postdata . '</div>' . "\n";
 	}
+	
 	$body .= easyedit_form($page, $msg, $vars['digest'], FALSE);
 
 	return array('msg'=>$_title_preview, 'body'=>$body);
@@ -415,8 +413,8 @@ function plugin_easyedit_write()
 	$digest = isset($vars['digest']) ? $vars['digest'] : '';
     //EasyEdit
     require_once(EASYEDIT_LIB_PATH . 'guiedit/htmlv2wiki.php');
-    $vars['msg'] = xhtml2wiki($vars['msg']);
-    $vars['msg'] = plugin_easyedit_inline_replace($vars['msg']);
+    $vars['msg'] = htmlv2wiki($vars['msg']);
+    //$vars['msg'] = plugin_easyedit_inline_replace($vars['msg']);
 
     //--------
 	$vars['msg'] = preg_replace(PLUGIN_EASYEDIT_FREEZE_REGEX, '', $vars['msg']);
@@ -514,8 +512,10 @@ function easyedit_form($page, $postdata, $digest = FALSE, $b_template = TRUE)
 	global $rule_page;
     //CKEditor & EasyEdit
     $EASYEDIT_LIB_PATH = EASYEDIT_LIB_PATH;
+    $PLUGIN_EASYEDIT_SKIN_FILE = PLUGIN_EASYEDIT_SKIN_FILE;
     $ckeditor = <<<EOD
     <div id="editor"></div>
+    <script>var guiedit_skin_dir = "{$PLUGIN_EASYEDIT_SKIN_FILE}";</script>
     <script src="{$EASYEDIT_LIB_PATH}ckeditor.js"></script>
     EOD;
     //--------
@@ -561,13 +561,15 @@ EOD;
 	$r_page      = rawurlencode($page);
 	$s_page      = htmlsc($page);
 	$s_digest    = htmlsc($digest);
-	$s_postdata  = htmlsc($refer . $postdata);
+	//$s_postdata  = htmlsc($refer . $postdata); → 不具合の原因
+	$s_postdata  = $refer . $postdata;
 	$s_original  = isset($vars['original']) ? htmlsc($vars['original']) : $s_postdata;
 	$b_preview   = isset($vars['preview']); // TRUE when preview
 	$btn_preview = $b_preview ? $_btn_repreview : $_btn_preview;
     require_once(EASYEDIT_LIB_PATH . 'guiedit/wiki2htmlv.php');
+
     $s_postdata = guiedit_convert_html($s_postdata);
-    $s_postdata = plugin_easyedit_inline_replace2($s_postdata);
+    //$s_postdata = plugin_easyedit_inline_replace2($s_postdata);
 
 	$add_notimestamp = '';
 	if ($notimeupdate != 0) {

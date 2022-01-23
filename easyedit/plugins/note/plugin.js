@@ -29,7 +29,7 @@ CKEDITOR.dialog.add( 'noteDialog', function( editor ) {
         ],
         onOk: function() {
             var dialog = this;
-            editor.insertHtml('<span class="note"><img alt="Note" src="'+url_path+'note/icons/note2.png" />'+dialog.getValueOf( 'note_input', 'note_id' )+'</span>');
+            editor.insertHtml('<span class="note"><img alt="Note" src="../'+url_path+'note/icons/note2.png" />'+dialog.getValueOf( 'note_input', 'note_id' )+'</span>');
         }
     };
 });
